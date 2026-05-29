@@ -47,6 +47,17 @@ def post_json(url, payload, headers):
         raise LmBashError("Provider returned an invalid JSON response") from exc
 
 
+def clean_command(content):
+    command = content.strip()
+    if command.startswith("```") and command.endswith("```"):
+        lines = command.splitlines()
+        if len(lines) >= 2:
+            command = "\n".join(lines[1:-1]).strip()
+    if not command:
+        raise LmBashError("Provider returned an empty command")
+    return command
+
+
 class OpenAICompatibleClient:
     def __init__(self, config):
         self.config = config
@@ -75,7 +86,7 @@ class OpenAICompatibleClient:
             raise LmBashError("Provider returned an invalid chat completion response") from exc
         if not isinstance(content, str):
             raise LmBashError("Provider returned an invalid chat completion response")
-        return content
+        return clean_command(content)
 
 
 class ClaudeCompatibleClient:
@@ -110,7 +121,7 @@ class ClaudeCompatibleClient:
             if isinstance(item, dict) and item.get("type") == "text":
                 text = item.get("text")
                 if isinstance(text, str):
-                    return text
+                    return clean_command(text)
         raise LmBashError("Provider returned an invalid Claude message response")
 
 
