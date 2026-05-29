@@ -35,6 +35,10 @@ class TerminalTests(unittest.TestCase):
         self.assertIn("Generated command", text)
         self.assertIn("ls -la", text)
 
+    def test_command_separator_matches_generated_command_rule(self):
+        block_lines = terminal.command_block("ls -la", stream=FakeStream(False)).splitlines()
+        self.assertEqual(terminal.separator(stream=FakeStream(False)), block_lines[2])
+
 
 if __name__ == "__main__":
     unittest.main()

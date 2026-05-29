@@ -10,6 +10,8 @@ COLORS = {
     "bold": "1",
 }
 
+COMMAND_HEADING = "Generated command"
+
 
 def supports_color(stream=None):
     stream = stream or sys.stdout
@@ -43,8 +45,8 @@ def error(text, stream=None):
 
 
 def command_block(command, stream=None):
-    return f"\n{heading('Generated command', stream)}\n{style(command, 'green', stream)}"
+    return f"\n{heading(COMMAND_HEADING, stream)}\n{style(command, 'green', stream)}"
 
 
 def separator(stream=None):
-    return style("────────", "cyan", stream)
+    return style("─" * len(COMMAND_HEADING), "cyan", stream)
