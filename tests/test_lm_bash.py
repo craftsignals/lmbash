@@ -23,6 +23,15 @@ class ApiTests(unittest.TestCase):
 
 
 class CliTests(unittest.TestCase):
+    def test_help_mentions_config_command(self):
+        with self.assertRaises(SystemExit) as cm, mock.patch("sys.stdout") as stdout:
+            lmbash.parse_args(["--help"])
+
+        self.assertEqual(cm.exception.code, 0)
+        output = "".join(call.args[0] for call in stdout.write.call_args_list)
+        self.assertIn("config", output)
+        self.assertIn("Configure lmbash", output)
+
     def test_get_prompt_joins_positional_words(self):
         args = lmbash.parse_args(["list", "files"])
         self.assertEqual(lmbash.prompt_from_args(args), "list files")

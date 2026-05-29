@@ -37,7 +37,8 @@ def parse_args(argv=None):
         return args
 
     parser = argparse.ArgumentParser(
-        description="Generate and optionally run a bash command using a configured provider."
+        description="Generate and optionally run a bash command using a configured provider.",
+        epilog="Commands: config  Configure lmbash",
     )
     parser.add_argument(
         "--base-url",
