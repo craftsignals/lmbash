@@ -79,6 +79,24 @@ class ProviderClientTests(unittest.TestCase):
         self.assertEqual(command, "pwd")
 
     @mock.patch("lmbash.providers.urllib.request.urlopen")
+    def test_openai_uses_last_non_empty_line_from_multi_command_response(self, urlopen):
+        urlopen.return_value = self.make_response(
+            {"choices": [{"message": {"content": "ls\nls -a"}}]}
+        )
+        client = build_client(
+            ProviderConfig(
+                provider="openai-compatible",
+                base_url="https://api.example.test/v1",
+                api_key="secret-key",
+                model="example-model",
+            )
+        )
+
+        command = client.request_command("list hidden files")
+
+        self.assertEqual(command, "ls -a")
+
+    @mock.patch("lmbash.providers.urllib.request.urlopen")
     def test_openai_rejects_empty_output_after_cleanup(self, urlopen):
         urlopen.return_value = self.make_response(
             {"choices": [{"message": {"content": "   "}}]}
@@ -142,6 +160,24 @@ class ProviderClientTests(unittest.TestCase):
         command = client.request_command("list files")
 
         self.assertEqual(command, "ls -la")
+
+    @mock.patch("lmbash.providers.urllib.request.urlopen")
+    def test_claude_uses_last_non_empty_line_from_multi_command_response(self, urlopen):
+        urlopen.return_value = self.make_response(
+            {"content": [{"type": "text", "text": "ls\nls -a"}]}
+        )
+        client = build_client(
+            ProviderConfig(
+                provider="claude-compatible",
+                base_url="https://claude.example.test",
+                api_key="claude-key",
+                model="claude-model",
+            )
+        )
+
+        command = client.request_command("list hidden files")
+
+        self.assertEqual(command, "ls -a")
 
     @mock.patch("lmbash.providers.urllib.request.urlopen")
     def test_claude_rejects_empty_output_after_cleanup(self, urlopen):

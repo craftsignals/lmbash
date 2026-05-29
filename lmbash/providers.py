@@ -53,6 +53,9 @@ def clean_command(content):
         lines = command.splitlines()
         if len(lines) >= 2:
             command = "\n".join(lines[1:-1]).strip()
+    lines = [line.strip() for line in command.splitlines() if line.strip()]
+    if len(lines) > 1:
+        command = lines[-1]
     if not command:
         raise LmBashError("Provider returned an empty command")
     return command
