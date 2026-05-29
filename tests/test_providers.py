@@ -27,7 +27,7 @@ class ProviderClientTests(unittest.TestCase):
             )
         )
 
-        command = client.complete_command("show current directory")
+        command = client.request_command("show current directory")
 
         self.assertEqual(command, "pwd")
         request = urlopen.call_args.args[0]
@@ -55,7 +55,7 @@ class ProviderClientTests(unittest.TestCase):
             )
         )
 
-        client.complete_command("show current directory")
+        client.request_command("show current directory")
 
         request = urlopen.call_args.args[0]
         self.assertNotIn("Authorization", request.headers)
@@ -74,7 +74,7 @@ class ProviderClientTests(unittest.TestCase):
             )
         )
 
-        command = client.complete_command("show current directory")
+        command = client.request_command("show current directory")
 
         self.assertEqual(command, "pwd")
 
@@ -93,7 +93,7 @@ class ProviderClientTests(unittest.TestCase):
         )
 
         with self.assertRaises(LmBashError):
-            client.complete_command("show current directory")
+            client.request_command("show current directory")
 
     @mock.patch("lmbash.providers.urllib.request.urlopen")
     def test_claude_posts_message_request_and_parses_text_response(self, urlopen):
@@ -109,7 +109,7 @@ class ProviderClientTests(unittest.TestCase):
             )
         )
 
-        command = client.complete_command("list files")
+        command = client.request_command("list files")
 
         self.assertEqual(command, "ls -la")
         request = urlopen.call_args.args[0]
@@ -139,7 +139,7 @@ class ProviderClientTests(unittest.TestCase):
             )
         )
 
-        command = client.complete_command("list files")
+        command = client.request_command("list files")
 
         self.assertEqual(command, "ls -la")
 
@@ -158,7 +158,7 @@ class ProviderClientTests(unittest.TestCase):
         )
 
         with self.assertRaises(LmBashError):
-            client.complete_command("list files")
+            client.request_command("list files")
 
     def test_unknown_provider_raises_lmbash_error(self):
         config = ProviderConfig(

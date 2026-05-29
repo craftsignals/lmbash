@@ -114,6 +114,30 @@ class CliTests(unittest.TestCase):
 
     @mock.patch("lmbash.cli.run_command")
     @mock.patch("lmbash.cli.build_client")
+    @mock.patch("lmbash.cli.load_effective_config")
+    def test_main_uses_client_validated_command_without_recleaning(
+        self, load_effective_config, build_client, run_command
+    ):
+        client = mock.Mock()
+        client.request_command.return_value = "```bash\npwd\n```"
+        build_client.return_value = client
+        load_effective_config.return_value = ProviderConfig(
+            provider="openai-compatible",
+            base_url="http://localhost:1234/v1",
+            api_key="",
+            model="local-model",
+            preset="lmstudio",
+        )
+        run_command.return_value = mock.Mock(stdout="", stderr="", returncode=0)
+
+        with mock.patch("builtins.input", return_value="y"), mock.patch("sys.stdout"):
+            exit_code = lmbash.main(["show pwd"])
+
+        self.assertEqual(exit_code, 0)
+        run_command.assert_called_once_with("```bash\npwd\n```")
+
+    @mock.patch("lmbash.cli.run_command")
+    @mock.patch("lmbash.cli.build_client")
     def test_main_missing_config_configures_saves_and_executes_prompt(self, build_client, run_command):
         client = mock.Mock()
         client.request_command.return_value = "pwd"

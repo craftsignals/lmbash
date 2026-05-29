@@ -223,7 +223,7 @@ def main(argv=None):
 
     while True:
         try:
-            command = clean_command(client.request_command(request_prompt))
+            command = client.request_command(request_prompt)
         except LmBashError as exc:
             print(f"Error: {exc}", file=sys.stderr)
             return 1
