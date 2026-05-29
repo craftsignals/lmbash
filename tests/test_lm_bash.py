@@ -137,7 +137,7 @@ class CliTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
             os.environ, {"XDG_CONFIG_HOME": temp_dir}, clear=True
-        ), mock.patch("builtins.input", side_effect=["1", "4", "local-model", "y"]), mock.patch(
+        ), mock.patch("builtins.input", side_effect=["1", "4", "local-model", "n", "y"]), mock.patch(
             "getpass.getpass", return_value=""
         ), mock.patch(
             "sys.stdout"
@@ -195,7 +195,7 @@ class CliTests(unittest.TestCase):
     def test_main_config_saves_interactive_config(self):
         with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
             os.environ, {"XDG_CONFIG_HOME": temp_dir}, clear=True
-        ), mock.patch("builtins.input", side_effect=["1", "4", "llama3"]), mock.patch(
+        ), mock.patch("builtins.input", side_effect=["1", "4", "llama3", "n"]), mock.patch(
             "getpass.getpass", return_value=""
         ), mock.patch(
             "sys.stdout"
@@ -211,7 +211,7 @@ class CliTests(unittest.TestCase):
     def test_main_config_show_prints_masked_config(self):
         with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
             os.environ, {"XDG_CONFIG_HOME": temp_dir}, clear=True
-        ), mock.patch("builtins.input", side_effect=["1", "2", "openrouter/model"]), mock.patch(
+        ), mock.patch("builtins.input", side_effect=["1", "2", "openrouter/model", "n"]), mock.patch(
             "getpass.getpass", return_value="sk-openrouter-secret"
         ), mock.patch("sys.stdout"):
             self.assertEqual(lmbash.main(["config"]), 0)
@@ -253,7 +253,7 @@ class CliTests(unittest.TestCase):
     def test_main_config_reset_removes_existing_config(self):
         with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
             os.environ, {"XDG_CONFIG_HOME": temp_dir}, clear=True
-        ), mock.patch("builtins.input", side_effect=["2", "1", "claude"]), mock.patch(
+        ), mock.patch("builtins.input", side_effect=["2", "1", "claude", "n"]), mock.patch(
             "getpass.getpass", return_value="secret"
         ), mock.patch(
             "sys.stdout"

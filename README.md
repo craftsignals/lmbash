@@ -73,7 +73,18 @@ export LMBASH_PROVIDER="openai-compatible"
 export LMBASH_BASE_URL="https://openrouter.ai/api/v1"
 export LMBASH_API_KEY="your-api-key"
 export LMBASH_MODEL="your/model-name"
+export LMBASH_PROXY_URL="socks5h://127.0.0.1:7890"
 ```
+
+The setup wizard can also save an optional proxy URL. Supported proxy schemes:
+
+- `http://...`
+- `https://...`
+- `socks5://...`
+- `socks5h://...`
+
+For SOCKS proxies, `socks5h://127.0.0.1:7890` is usually the best choice
+because DNS resolution also goes through the proxy.
 
 ## Usage
 

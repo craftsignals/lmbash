@@ -1,5 +1,8 @@
 from dataclasses import dataclass
+import importlib
 import json
+import socket
+from urllib.parse import urlparse
 import urllib.error
 import urllib.request
 
@@ -21,9 +24,10 @@ class ProviderConfig:
     api_key: str
     model: str
     preset: str = "custom"
+    proxy_url: str = ""
 
 
-def post_json(url, payload, headers):
+def post_json(url, payload, headers, proxy_url=""):
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
         url,
@@ -31,15 +35,50 @@ def post_json(url, payload, headers):
         headers=headers,
         method="POST",
     )
+    return open_json_request(request, proxy_url)
+
+
+def open_json_request(request, proxy_url=""):
+    opener = None
+    original_socket = None
+    if proxy_url:
+        parsed = urlparse(proxy_url)
+        if parsed.scheme in {"http", "https"}:
+            handler = urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
+            opener = urllib.request.build_opener(handler)
+        elif parsed.scheme in {"socks5", "socks5h"}:
+            if not parsed.hostname or not parsed.port:
+                raise LmBashError("SOCKS proxy URL must include host and port")
+            try:
+                socks = importlib.import_module("socks")
+            except ImportError as exc:
+                raise LmBashError("SOCKS proxy requires PySocks to be installed") from exc
+            socks.set_default_proxy(
+                socks.SOCKS5,
+                parsed.hostname,
+                parsed.port,
+                rdns=parsed.scheme == "socks5h",
+            )
+            original_socket = socket.socket
+            socket.socket = socks.socksocket
+        else:
+            raise LmBashError(f"Unsupported proxy scheme: {parsed.scheme}")
 
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        if opener is None:
+            response_context = urllib.request.urlopen(request, timeout=60)
+        else:
+            response_context = opener.open(request, timeout=60)
+        with response_context as response:
             body = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise LmBashError(f"Provider returned HTTP {exc.code}: {detail}") from exc
     except urllib.error.URLError as exc:
         raise LmBashError(f"Cannot reach provider: {exc.reason}") from exc
+    finally:
+        if original_socket is not None:
+            socket.socket = original_socket
 
     try:
         return json.loads(body)
@@ -84,6 +123,7 @@ class OpenAICompatibleClient:
             self.config.base_url.rstrip("/") + "/chat/completions",
             payload,
             headers,
+            self.config.proxy_url,
         )
 
         try:
@@ -118,6 +158,7 @@ class ClaudeCompatibleClient:
                 "x-api-key": self.config.api_key,
                 "anthropic-version": "2023-06-01",
             },
+            self.config.proxy_url,
         )
 
         try:

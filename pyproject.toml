@@ -9,6 +9,7 @@ description = "Generate and optionally run bash commands using an LLM provider."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
+dependencies = ["PySocks>=1.7.1"]
 authors = [
   { name = "Kyle" }
 ]

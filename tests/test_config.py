@@ -63,6 +63,7 @@ class ConfigTests(unittest.TestCase):
                 api_key="",
                 model="local-model",
                 preset="lmstudio",
+                proxy_url="",
             ),
         )
 
@@ -75,6 +76,7 @@ class ConfigTests(unittest.TestCase):
                 api_key="secret",
                 model="claude-model",
                 preset="anthropic",
+                proxy_url="socks5h://127.0.0.1:7890",
             )
 
             save_config(config, path)
@@ -92,12 +94,33 @@ class ConfigTests(unittest.TestCase):
                         "api_key": "secret",
                         "model": "claude-model",
                         "preset": "anthropic",
+                        "proxy_url": "socks5h://127.0.0.1:7890",
                     },
                 )
 
     def test_load_config_returns_none_when_file_is_missing(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             self.assertIsNone(load_config(Path(temp_dir) / "missing.json"))
+
+    def test_load_config_defaults_missing_proxy_url_to_empty(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "config.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "provider": "openai-compatible",
+                        "base_url": "http://localhost:1234/v1",
+                        "api_key": "",
+                        "model": "local-model",
+                        "preset": "lmstudio",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            config = load_config(path)
+
+        self.assertEqual(config.proxy_url, "")
 
     def test_load_config_rejects_invalid_json_and_missing_required_fields(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -134,6 +157,7 @@ class ConfigTests(unittest.TestCase):
             "LMBASH_BASE_URL": "https://api.anthropic.com",
             "LMBASH_API_KEY": "secret",
             "LMBASH_MODEL": "claude-model",
+            "LMBASH_PROXY_URL": "socks5h://127.0.0.1:7890",
         }
 
         with mock.patch.dict(os.environ, env, clear=True):
@@ -147,6 +171,7 @@ class ConfigTests(unittest.TestCase):
                 api_key="secret",
                 model="claude-model",
                 preset="lmstudio",
+                proxy_url="socks5h://127.0.0.1:7890",
             ),
         )
         self.assertEqual(config.preset, "lmstudio")
@@ -180,7 +205,7 @@ class ConfigTests(unittest.TestCase):
     def test_configure_interactively_openrouter_preset_requires_api_key(self):
         with mock.patch(
             "builtins.input",
-            side_effect=["1", "2", "openrouter/model"],
+            side_effect=["1", "2", "openrouter/model", "y", "socks5h://127.0.0.1:7890"],
         ), mock.patch("getpass.getpass", return_value="sk-openrouter-secret"), mock.patch(
             "sys.stdout"
         ):
@@ -194,11 +219,12 @@ class ConfigTests(unittest.TestCase):
                 base_url="https://openrouter.ai/api/v1",
                 api_key="sk-openrouter-secret",
                 model="openrouter/model",
+                proxy_url="socks5h://127.0.0.1:7890",
             ),
         )
 
     def test_configure_interactively_ollama_preset_allows_empty_api_key(self):
-        with mock.patch("builtins.input", side_effect=["1", "4", "llama3"]), mock.patch(
+        with mock.patch("builtins.input", side_effect=["1", "4", "llama3", "n"]), mock.patch(
             "getpass.getpass", return_value=""
         ) as getpass, mock.patch("sys.stdout"):
             config = configure_interactively()
@@ -212,13 +238,14 @@ class ConfigTests(unittest.TestCase):
                 base_url="http://localhost:11434/v1",
                 api_key="",
                 model="llama3",
+                proxy_url="",
             ),
         )
 
     def test_configure_interactively_anthropic_preset(self):
         with mock.patch(
             "builtins.input",
-            side_effect=["2", "1", "claude-3-5-sonnet"],
+            side_effect=["2", "1", "claude-3-5-sonnet", ""],
         ), mock.patch("getpass.getpass", return_value="anthropic-secret"), mock.patch(
             "sys.stdout"
         ):
@@ -232,11 +259,12 @@ class ConfigTests(unittest.TestCase):
                 base_url="https://api.anthropic.com",
                 api_key="anthropic-secret",
                 model="claude-3-5-sonnet",
+                proxy_url="",
             ),
         )
 
     def test_configure_interactively_retries_invalid_choice(self):
-        with mock.patch("builtins.input", side_effect=["bad", "1", "4", "llama3"]), mock.patch(
+        with mock.patch("builtins.input", side_effect=["bad", "1", "4", "llama3", "n"]), mock.patch(
             "getpass.getpass", return_value=""
         ), mock.patch("sys.stdout"):
             config = configure_interactively()
@@ -251,6 +279,7 @@ class ConfigTests(unittest.TestCase):
             base_url="https://api.openai.com/v1",
             api_key="sk-very-secret-key",
             model="gpt-4.1-mini",
+            proxy_url="socks5://127.0.0.1:7890",
         )
 
         formatted = format_config(config)
@@ -258,9 +287,15 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("provider: openai-compatible", formatted)
         self.assertIn("preset: openai", formatted)
         self.assertIn("base_url: https://api.openai.com/v1", formatted)
+        self.assertIn("proxy: socks5://127.0.0.1:7890", formatted)
         self.assertIn("api_key: sk-v...-key", formatted)
         self.assertIn("model: gpt-4.1-mini", formatted)
         self.assertNotIn("sk-very-secret-key", formatted)
+
+    def test_format_config_shows_disabled_proxy(self):
+        formatted = format_config(DEFAULT_CONFIG)
+
+        self.assertIn("proxy: disabled", formatted)
 
 
 if __name__ == "__main__":

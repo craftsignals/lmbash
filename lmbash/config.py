@@ -40,6 +40,7 @@ DEFAULT_CONFIG = ProviderConfig(
     api_key="",
     model="local-model",
     preset="lmstudio",
+    proxy_url="",
 )
 
 
@@ -77,6 +78,7 @@ def load_config(path=None):
 
     values = {field: data[field] for field in required_fields}
     values["preset"] = data.get("preset", "custom")
+    values["proxy_url"] = data.get("proxy_url", "")
     for field, value in values.items():
         if not isinstance(value, str):
             raise ConfigError(f"Config field must be a string: {field}")
@@ -109,6 +111,7 @@ def apply_env_overrides(config):
         api_key=os.environ.get("LMBASH_API_KEY", config.api_key),
         model=os.environ.get("LMBASH_MODEL", config.model),
         preset=config.preset,
+        proxy_url=os.environ.get("LMBASH_PROXY_URL", config.proxy_url),
     )
 
 
@@ -179,6 +182,10 @@ def configure_interactively():
         raise ConfigError("API key cannot be empty")
 
     model = _prompt_required("Model: ")
+    proxy_enabled = input("Enable proxy? [y/N] ").strip().lower() in {"y", "yes"}
+    proxy_url = ""
+    if proxy_enabled:
+        proxy_url = _prompt_required("Proxy URL: ")
 
     return ProviderConfig(
         provider=provider,
@@ -186,6 +193,7 @@ def configure_interactively():
         base_url=base_url,
         api_key=api_key,
         model=model,
+        proxy_url=proxy_url,
     )
 
 
@@ -197,5 +205,6 @@ def format_config(config):
             f"base_url: {config.base_url}",
             f"api_key: {mask_api_key(config.api_key)}",
             f"model: {config.model}",
+            f"proxy: {config.proxy_url or 'disabled'}",
         ]
     )

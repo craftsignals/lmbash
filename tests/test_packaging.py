@@ -34,6 +34,9 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("LMBASH_BASE_URL", readme_text)
         self.assertIn("LMBASH_API_KEY", readme_text)
         self.assertIn("LMBASH_MODEL", readme_text)
+        self.assertIn("LMBASH_PROXY_URL", readme_text)
+        self.assertIn("socks5h://127.0.0.1:7890", readme_text)
+        self.assertIn("proxy", readme_text)
         self.assertIn("Review every command", readme_text)
         self.assertIn("python3 -m unittest -v", readme_text)
         self.assertIn("python3 -m build", readme_text)
@@ -49,6 +52,7 @@ class PackagingTests(unittest.TestCase):
         self.assertNotIn("LM Studio", data["project"]["description"])
         self.assertIn("openrouter", data["project"]["keywords"])
         self.assertIn("ollama", data["project"]["keywords"])
+        self.assertIn("PySocks>=1.7.1", data["project"]["dependencies"])
 
     def test_mit_license_file_exists(self):
         license_path = Path(__file__).resolve().parents[1] / "LICENSE"

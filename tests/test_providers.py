@@ -1,4 +1,6 @@
 import json
+import socket
+import sys
 import unittest
 from unittest import mock
 
@@ -95,6 +97,80 @@ class ProviderClientTests(unittest.TestCase):
         command = client.request_command("list hidden files")
 
         self.assertEqual(command, "ls -a")
+
+    @mock.patch("lmbash.providers.urllib.request.build_opener")
+    def test_openai_uses_http_proxy_handler_when_proxy_url_is_http(self, build_opener):
+        opener = mock.Mock()
+        opener.open.return_value = self.make_response(
+            {"choices": [{"message": {"content": "pwd"}}]}
+        )
+        build_opener.return_value = opener
+        client = build_client(
+            ProviderConfig(
+                provider="openai-compatible",
+                base_url="https://api.example.test/v1",
+                api_key="secret-key",
+                model="example-model",
+                proxy_url="http://127.0.0.1:7890",
+            )
+        )
+
+        command = client.request_command("show pwd")
+
+        self.assertEqual(command, "pwd")
+        handler = build_opener.call_args.args[0]
+        self.assertEqual(handler.proxies["http"], "http://127.0.0.1:7890")
+        self.assertEqual(handler.proxies["https"], "http://127.0.0.1:7890")
+        opener.open.assert_called_once()
+
+    @mock.patch("lmbash.providers.urllib.request.urlopen")
+    def test_openai_uses_socks_proxy_socket_temporarily(self, urlopen):
+        class FakeSocks:
+            SOCKS5 = object()
+            socksocket = object()
+
+            def __init__(self):
+                self.calls = []
+
+            def set_default_proxy(self, proxy_type, host, port, rdns):
+                self.calls.append((proxy_type, host, port, rdns))
+
+        fake_socks = FakeSocks()
+        urlopen.return_value = self.make_response(
+            {"choices": [{"message": {"content": "pwd"}}]}
+        )
+        original_socket = socket.socket
+        client = build_client(
+            ProviderConfig(
+                provider="openai-compatible",
+                base_url="https://api.example.test/v1",
+                api_key="secret-key",
+                model="example-model",
+                proxy_url="socks5h://127.0.0.1:7890",
+            )
+        )
+
+        with mock.patch.dict(sys.modules, {"socks": fake_socks}):
+            command = client.request_command("show pwd")
+
+        self.assertEqual(command, "pwd")
+        self.assertEqual(fake_socks.calls, [(fake_socks.SOCKS5, "127.0.0.1", 7890, True)])
+        self.assertIs(socket.socket, original_socket)
+
+    def test_socks_proxy_without_pysocks_raises_lmbash_error(self):
+        client = build_client(
+            ProviderConfig(
+                provider="openai-compatible",
+                base_url="https://api.example.test/v1",
+                api_key="secret-key",
+                model="example-model",
+                proxy_url="socks5://127.0.0.1:7890",
+            )
+        )
+
+        with mock.patch.dict(sys.modules, {"socks": None}):
+            with self.assertRaises(LmBashError):
+                client.request_command("show pwd")
 
     @mock.patch("lmbash.providers.urllib.request.urlopen")
     def test_openai_rejects_empty_output_after_cleanup(self, urlopen):
