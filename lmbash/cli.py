@@ -1,4 +1,5 @@
 import argparse
+from dataclasses import replace
 import json
 import os
 import subprocess
@@ -8,13 +9,14 @@ import urllib.request
 
 from lmbash.config import (
     ConfigError,
+    apply_env_overrides,
     configure_interactively,
     format_config,
     load_config,
     remove_config,
     save_config,
 )
-from lmbash.providers import LmBashError
+from lmbash.providers import LmBashError, build_client
 
 
 DEFAULT_BASE_URL = "http://localhost:1234/v1"
@@ -108,10 +110,10 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--base-url",
-        default=DEFAULT_BASE_URL,
+        default=None,
         help=f"LM Studio API base URL, default: {DEFAULT_BASE_URL}",
     )
-    parser.add_argument("--model", default=default_model(), help="LM Studio model name")
+    parser.add_argument("--model", default=None, help="LM Studio model name")
     parser.add_argument("prompt", nargs="*", help="Natural-language command request")
     args = parser.parse_args(argv)
     args.command = None
@@ -143,6 +145,21 @@ def print_result(result):
     if result.stderr:
         print(result.stderr, end="", file=sys.stderr)
     print(f"\nExit code: {result.returncode}")
+
+
+def load_effective_config(args):
+    config = load_config()
+    if config is None:
+        print("No lmbash config found. Starting setup.")
+        config = configure_interactively()
+        save_config(config)
+
+    config = apply_env_overrides(config)
+    if args.base_url is not None:
+        config = replace(config, base_url=args.base_url)
+    if args.model is not None:
+        config = replace(config, model=args.model)
+    return config
 
 
 def handle_config_command(args):
@@ -195,11 +212,18 @@ def main(argv=None):
         print("Error: prompt cannot be empty", file=sys.stderr)
         return 2
 
+    try:
+        config = load_effective_config(args)
+        client = build_client(config)
+    except (ConfigError, LmBashError, OSError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
     request_prompt = prompt
 
     while True:
         try:
-            command = request_command(request_prompt, args.base_url, args.model)
+            command = clean_command(client.request_command(request_prompt))
         except LmBashError as exc:
             print(f"Error: {exc}", file=sys.stderr)
             return 1

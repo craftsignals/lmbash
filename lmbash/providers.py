@@ -62,6 +62,9 @@ class OpenAICompatibleClient:
     def __init__(self, config):
         self.config = config
 
+    def request_command(self, prompt):
+        return self.complete_command(prompt)
+
     def complete_command(self, prompt):
         headers = {"Content-Type": "application/json"}
         if self.config.api_key:
@@ -92,6 +95,9 @@ class OpenAICompatibleClient:
 class ClaudeCompatibleClient:
     def __init__(self, config):
         self.config = config
+
+    def request_command(self, prompt):
+        return self.complete_command(prompt)
 
     def complete_command(self, prompt):
         payload = {

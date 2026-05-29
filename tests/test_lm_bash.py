@@ -5,6 +5,7 @@ from unittest import mock
 
 import lmbash.cli as lmbash
 from lmbash.config import load_config
+from lmbash.providers import ProviderConfig
 
 
 class CleanupTests(unittest.TestCase):
@@ -81,9 +82,21 @@ class CliTests(unittest.TestCase):
             self.assertEqual(lmbash.choose_action(), "edit")
 
     @mock.patch("lmbash.cli.run_command")
-    @mock.patch("lmbash.cli.request_command")
-    def test_main_refines_command_with_context_before_execute(self, request_command, run_command):
-        request_command.side_effect = ["ls", "ls -a"]
+    @mock.patch("lmbash.cli.build_client")
+    @mock.patch("lmbash.cli.load_effective_config")
+    def test_main_refines_command_with_context_before_execute(
+        self, load_effective_config, build_client, run_command
+    ):
+        client = mock.Mock()
+        client.request_command.side_effect = ["ls", "ls -a"]
+        build_client.return_value = client
+        load_effective_config.return_value = ProviderConfig(
+            provider="openai-compatible",
+            base_url="http://localhost:1234/v1",
+            api_key="",
+            model="local-model",
+            preset="lmstudio",
+        )
         run_command.return_value = mock.Mock(stdout="", stderr="", returncode=0)
 
         with mock.patch("builtins.input", side_effect=["e", "include hidden files", "y"]), mock.patch(
@@ -92,12 +105,77 @@ class CliTests(unittest.TestCase):
             exit_code = lmbash.main(["list files"])
 
         self.assertEqual(exit_code, 0)
-        self.assertEqual(request_command.call_count, 2)
-        refinement_prompt = request_command.call_args_list[1].args[0]
+        self.assertEqual(client.request_command.call_count, 2)
+        refinement_prompt = client.request_command.call_args_list[1].args[0]
         self.assertIn("Original request:\nlist files", refinement_prompt)
         self.assertIn("Current command:\nls", refinement_prompt)
         self.assertIn("New requirement:\ninclude hidden files", refinement_prompt)
         run_command.assert_called_once_with("ls -a")
+
+    @mock.patch("lmbash.cli.run_command")
+    @mock.patch("lmbash.cli.build_client")
+    def test_main_missing_config_configures_saves_and_executes_prompt(self, build_client, run_command):
+        client = mock.Mock()
+        client.request_command.return_value = "pwd"
+        build_client.return_value = client
+        run_command.return_value = mock.Mock(stdout="", stderr="", returncode=0)
+
+        with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
+            os.environ, {"XDG_CONFIG_HOME": temp_dir}, clear=True
+        ), mock.patch("builtins.input", side_effect=["1", "4", "local-model", "y"]), mock.patch(
+            "getpass.getpass", return_value=""
+        ), mock.patch(
+            "sys.stdout"
+        ) as stdout:
+            exit_code = lmbash.main(["show pwd"])
+            saved_config = load_config()
+
+        output = "".join(call.args[0] for call in stdout.write.call_args_list)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("No lmbash config found. Starting setup.", output)
+        self.assertEqual(saved_config.provider, "openai-compatible")
+        self.assertEqual(saved_config.preset, "ollama")
+        self.assertEqual(saved_config.model, "local-model")
+        build_client.assert_called_once_with(saved_config)
+        client.request_command.assert_called_once_with("show pwd")
+        run_command.assert_called_once_with("pwd")
+
+    @mock.patch("lmbash.cli.build_client")
+    def test_main_saved_config_applies_cli_base_url_and_model_overrides(self, build_client):
+        client = mock.Mock()
+        client.request_command.return_value = "pwd"
+        build_client.return_value = client
+
+        with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
+            os.environ, {"XDG_CONFIG_HOME": temp_dir}, clear=True
+        ), mock.patch("builtins.input", return_value="n"), mock.patch("sys.stdout"):
+            lmbash.save_config(
+                ProviderConfig(
+                    provider="claude-compatible",
+                    base_url="https://saved.example.test",
+                    api_key="secret",
+                    model="saved-model",
+                    preset="anthropic",
+                )
+            )
+
+            exit_code = lmbash.main(
+                [
+                    "--base-url",
+                    "https://override.example.test",
+                    "--model",
+                    "override-model",
+                    "show pwd",
+                ]
+            )
+
+        self.assertEqual(exit_code, 0)
+        config = build_client.call_args.args[0]
+        self.assertEqual(config.provider, "claude-compatible")
+        self.assertEqual(config.base_url, "https://override.example.test")
+        self.assertEqual(config.model, "override-model")
+        self.assertEqual(config.api_key, "secret")
+        self.assertEqual(config.preset, "anthropic")
 
     def test_main_config_saves_interactive_config(self):
         with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
