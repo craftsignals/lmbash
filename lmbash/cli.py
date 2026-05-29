@@ -6,6 +6,14 @@ import sys
 import urllib.error
 import urllib.request
 
+from lmbash.config import (
+    ConfigError,
+    configure_interactively,
+    format_config,
+    load_config,
+    remove_config,
+    save_config,
+)
 from lmbash.providers import LmBashError
 
 
@@ -85,6 +93,16 @@ def request_command(prompt, base_url, model):
 
 
 def parse_args(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == "config":
+        parser = argparse.ArgumentParser(description="Manage lmbash config")
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument("--show", action="store_true", help="Show saved config")
+        group.add_argument("--reset", action="store_true", help="Remove saved config")
+        args = parser.parse_args(argv[1:])
+        args.command = "config"
+        return args
+
     parser = argparse.ArgumentParser(
         description="Generate and optionally run a bash command using local LM Studio."
     )
@@ -95,7 +113,9 @@ def parse_args(argv=None):
     )
     parser.add_argument("--model", default=default_model(), help="LM Studio model name")
     parser.add_argument("prompt", nargs="*", help="Natural-language command request")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    args.command = None
+    return args
 
 
 def prompt_from_args(args):
@@ -125,8 +145,37 @@ def print_result(result):
     print(f"\nExit code: {result.returncode}")
 
 
+def handle_config_command(args):
+    if args.show:
+        config = load_config()
+        if config is None:
+            print("No lmbash config found.")
+            return 1
+        print(format_config(config))
+        return 0
+
+    if args.reset:
+        if remove_config():
+            print("Config removed.")
+        else:
+            print("No lmbash config found.")
+        return 0
+
+    try:
+        config = configure_interactively()
+        save_config(config)
+    except ConfigError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    print("Config saved.")
+    return 0
+
+
 def main(argv=None):
     args = parse_args(argv)
+    if args.command == "config":
+        return handle_config_command(args)
+
     prompt = prompt_from_args(args)
     if not prompt:
         print("Error: prompt cannot be empty", file=sys.stderr)

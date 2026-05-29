@@ -13,6 +13,8 @@ from lmbash.config import (
     ConfigError,
     apply_env_overrides,
     config_path,
+    configure_interactively,
+    format_config,
     load_config,
     mask_api_key,
     remove_config,
@@ -174,6 +176,75 @@ class ConfigTests(unittest.TestCase):
                 config_path(),
                 Path("/home/example/.config/lmbash/config.json"),
             )
+
+    def test_configure_interactively_openrouter_preset_requires_api_key(self):
+        with mock.patch(
+            "builtins.input",
+            side_effect=["1", "2", "sk-openrouter-secret", "openrouter/model"],
+        ):
+            config = configure_interactively()
+
+        self.assertEqual(
+            config,
+            ProviderConfig(
+                provider="openai-compatible",
+                preset="openrouter",
+                base_url="https://openrouter.ai/api/v1",
+                api_key="sk-openrouter-secret",
+                model="openrouter/model",
+            ),
+        )
+
+    def test_configure_interactively_ollama_preset_allows_empty_api_key(self):
+        with mock.patch("builtins.input", side_effect=["1", "4", "", "llama3"]):
+            config = configure_interactively()
+
+        self.assertEqual(
+            config,
+            ProviderConfig(
+                provider="openai-compatible",
+                preset="ollama",
+                base_url="http://localhost:11434/v1",
+                api_key="",
+                model="llama3",
+            ),
+        )
+
+    def test_configure_interactively_anthropic_preset(self):
+        with mock.patch(
+            "builtins.input",
+            side_effect=["2", "1", "anthropic-secret", "claude-3-5-sonnet"],
+        ):
+            config = configure_interactively()
+
+        self.assertEqual(
+            config,
+            ProviderConfig(
+                provider="claude-compatible",
+                preset="anthropic",
+                base_url="https://api.anthropic.com",
+                api_key="anthropic-secret",
+                model="claude-3-5-sonnet",
+            ),
+        )
+
+    def test_format_config_masks_api_key(self):
+        config = ProviderConfig(
+            provider="openai-compatible",
+            preset="openai",
+            base_url="https://api.openai.com/v1",
+            api_key="sk-very-secret-key",
+            model="gpt-4.1-mini",
+        )
+
+        formatted = format_config(config)
+
+        self.assertIn("provider: openai-compatible", formatted)
+        self.assertIn("preset: openai", formatted)
+        self.assertIn("base_url: https://api.openai.com/v1", formatted)
+        self.assertIn("api_key: sk-v...-key", formatted)
+        self.assertIn("model: gpt-4.1-mini", formatted)
+        self.assertNotIn("sk-very-secret-key", formatted)
 
 
 if __name__ == "__main__":

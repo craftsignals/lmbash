@@ -116,3 +116,82 @@ def mask_api_key(api_key):
     if len(api_key) <= 8:
         return "****"
     return f"{api_key[:4]}...{api_key[-4:]}"
+
+
+def _choose_option(prompt, options):
+    print(prompt)
+    for index, label in enumerate(options, start=1):
+        print(f"{index}. {label}")
+
+    answer = input("> ").strip()
+    try:
+        choice = int(answer)
+    except ValueError as exc:
+        raise ConfigError("Invalid selection") from exc
+    if choice < 1 or choice > len(options):
+        raise ConfigError("Invalid selection")
+    return options[choice - 1]
+
+
+def _prompt_required(label):
+    value = input(label).strip()
+    if not value:
+        raise ConfigError(f"{label.rstrip(': ')} cannot be empty")
+    return value
+
+
+def configure_interactively():
+    provider_choice = _choose_option(
+        "Provider type:",
+        ["openai-compatible", "claude-compatible"],
+    )
+
+    if provider_choice == "openai-compatible":
+        provider = "openai-compatible"
+        preset_options = ["openai", "openrouter", "lmstudio", "ollama", "Custom"]
+        preset_choice = _choose_option("Preset:", preset_options)
+        presets = OPENAI_COMPATIBLE_PRESETS
+    else:
+        provider = "claude-compatible"
+        preset_options = ["anthropic", "Custom"]
+        preset_choice = _choose_option("Preset:", preset_options)
+        presets = CLAUDE_COMPATIBLE_PRESETS
+
+    if preset_choice == "Custom":
+        preset = "custom"
+        base_url = _prompt_required("Base URL: ")
+        requires_api_key = True
+    else:
+        preset = preset_choice
+        preset_config = presets[preset]
+        base_url = preset_config["base_url"]
+        requires_api_key = preset_config["requires_api_key"]
+
+    if not base_url:
+        raise ConfigError("Base URL cannot be empty")
+
+    api_key = input("API key: ").strip()
+    if requires_api_key and not api_key:
+        raise ConfigError("API key cannot be empty")
+
+    model = _prompt_required("Model: ")
+
+    return ProviderConfig(
+        provider=provider,
+        preset=preset,
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
+    )
+
+
+def format_config(config):
+    return "\n".join(
+        [
+            f"provider: {config.provider}",
+            f"preset: {config.preset}",
+            f"base_url: {config.base_url}",
+            f"api_key: {mask_api_key(config.api_key)}",
+            f"model: {config.model}",
+        ]
+    )
