@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 from lmbash.providers import ProviderConfig
+from lmbash import terminal
 
 
 OPENAI_COMPATIBLE_PRESETS = {
@@ -120,7 +121,7 @@ def mask_api_key(api_key):
 
 
 def _choose_option(prompt, options):
-    print(prompt)
+    print(terminal.prompt(prompt))
     for index, label in enumerate(options, start=1):
         print(f"{index}. {label}")
 
@@ -129,11 +130,11 @@ def _choose_option(prompt, options):
         try:
             choice = int(answer)
         except ValueError:
-            print("Invalid selection.")
+            print(terminal.status("Invalid selection."))
             continue
         if 1 <= choice <= len(options):
             return options[choice - 1]
-        print("Invalid selection.")
+        print(terminal.status("Invalid selection."))
 
 
 def _prompt_required(label):

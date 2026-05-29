@@ -13,6 +13,7 @@ from lmbash.config import (
     save_config,
 )
 from lmbash.providers import LmBashError, build_client
+from lmbash import terminal
 
 
 def build_refinement_prompt(original_prompt, previous_command, edit_request):
@@ -55,11 +56,11 @@ def parse_args(argv=None):
 def prompt_from_args(args):
     if args.prompt:
         return " ".join(args.prompt).strip()
-    return input("Describe the bash command you want: ").strip()
+    return input(terminal.prompt("Describe the bash command you want: ")).strip()
 
 
 def choose_action():
-    answer = input("Action? [y] execute, [e] edit, [N] cancel ").strip().lower()
+    answer = input(terminal.action("Action? [y] execute, [e] edit, [N] cancel ")).strip().lower()
     if answer in {"y", "yes"}:
         return "execute"
     if answer in {"e", "edit"}:
@@ -73,16 +74,18 @@ def run_command(command):
 
 def print_result(result):
     if result.stdout:
+        print(terminal.heading("stdout"))
         print(result.stdout, end="")
     if result.stderr:
+        print(terminal.heading("stderr"), file=sys.stderr)
         print(result.stderr, end="", file=sys.stderr)
-    print(f"\nExit code: {result.returncode}")
+    print(f"\n{terminal.status(f'Exit code: {result.returncode}')}")
 
 
 def load_effective_config(args):
     config = load_config()
     if config is None:
-        print("No lmbash config found. Starting setup.")
+        print(terminal.status("No lmbash config found. Starting setup."))
         config = configure_interactively()
         save_config(config)
 
@@ -99,10 +102,10 @@ def handle_config_command(args):
         try:
             config = load_config()
         except ConfigError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
+            print(terminal.error(str(exc), stream=sys.stderr), file=sys.stderr)
             return 1
         if config is None:
-            print("No lmbash config found.")
+            print(terminal.status("No lmbash config found."))
             return 1
         print(format_config(config))
         return 0
@@ -111,26 +114,26 @@ def handle_config_command(args):
         try:
             removed = remove_config()
         except OSError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
+            print(terminal.error(str(exc), stream=sys.stderr), file=sys.stderr)
             return 1
         if removed:
-            print("Config removed.")
+            print(terminal.status("Config removed."))
             return 0
-        print("No lmbash config found.")
+        print(terminal.status("No lmbash config found."))
         return 0
 
     try:
         config = configure_interactively()
     except ConfigError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        print(terminal.error(str(exc), stream=sys.stderr), file=sys.stderr)
         return 2
 
     try:
         save_config(config)
     except (ConfigError, OSError) as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        print(terminal.error(str(exc), stream=sys.stderr), file=sys.stderr)
         return 1
-    print("Config saved.")
+    print(terminal.status("Config saved."))
     return 0
 
 
@@ -141,14 +144,14 @@ def main(argv=None):
 
     prompt = prompt_from_args(args)
     if not prompt:
-        print("Error: prompt cannot be empty", file=sys.stderr)
+        print(terminal.error("prompt cannot be empty", stream=sys.stderr), file=sys.stderr)
         return 2
 
     try:
         config = load_effective_config(args)
         client = build_client(config)
     except (ConfigError, LmBashError, OSError) as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        print(terminal.error(str(exc), stream=sys.stderr), file=sys.stderr)
         return 1
 
     request_prompt = prompt
@@ -157,11 +160,10 @@ def main(argv=None):
         try:
             command = client.request_command(request_prompt)
         except LmBashError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
+            print(terminal.error(str(exc), stream=sys.stderr), file=sys.stderr)
             return 1
 
-        print("\nGenerated command:")
-        print(command)
+        print(terminal.command_block(command))
 
         action = choose_action()
         if action == "execute":
@@ -170,7 +172,7 @@ def main(argv=None):
             print("Cancelled.")
             return 0
 
-        edit_request = input("How should the command change? ").strip()
+        edit_request = input(terminal.prompt("How should the command change? ")).strip()
         if not edit_request:
             print("Cancelled.")
             return 0

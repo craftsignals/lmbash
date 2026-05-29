@@ -1,4 +1,5 @@
 import os
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -48,6 +49,25 @@ class CliTests(unittest.TestCase):
         with mock.patch("builtins.input", return_value="e"):
             self.assertEqual(lmbash.choose_action(), "edit")
 
+    def test_print_result_labels_stdout_stderr_and_exit_code(self):
+        result = subprocess.CompletedProcess(
+            args="cmd",
+            returncode=7,
+            stdout="out\n",
+            stderr="err\n",
+        )
+
+        with mock.patch("sys.stdout") as stdout, mock.patch("sys.stderr") as stderr:
+            lmbash.print_result(result)
+
+        stdout_output = "".join(call.args[0] for call in stdout.write.call_args_list)
+        stderr_output = "".join(call.args[0] for call in stderr.write.call_args_list)
+        self.assertIn("stdout", stdout_output)
+        self.assertIn("out\n", stdout_output)
+        self.assertIn("Exit code: 7", stdout_output)
+        self.assertIn("stderr", stderr_output)
+        self.assertIn("err\n", stderr_output)
+
     @mock.patch("lmbash.cli.run_command")
     @mock.patch("lmbash.cli.build_client")
     @mock.patch("lmbash.cli.load_effective_config")
@@ -68,10 +88,12 @@ class CliTests(unittest.TestCase):
 
         with mock.patch("builtins.input", side_effect=["e", "include hidden files", "y"]), mock.patch(
             "sys.stdout"
-        ):
+        ) as stdout:
             exit_code = lmbash.main(["list files"])
 
+        output = "".join(call.args[0] for call in stdout.write.call_args_list)
         self.assertEqual(exit_code, 0)
+        self.assertIn("Generated command", output)
         self.assertEqual(client.request_command.call_count, 2)
         refinement_prompt = client.request_command.call_args_list[1].args[0]
         self.assertIn("Original request:\nlist files", refinement_prompt)
