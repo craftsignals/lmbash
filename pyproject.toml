@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lmbash"
+version = "0.1.0"
+description = "Generate and optionally run bash commands using an LLM provider."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [
+  { name = "Kyle" }
+]
+keywords = ["anthropic", "bash", "claude", "cli", "lm-studio", "llm", "ollama", "openai", "openrouter", "shell"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Terminals",
+  "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/craftsignals/lmbash"
+Repository = "https://github.com/craftsignals/lmbash"
+Issues = "https://github.com/craftsignals/lmbash/issues"
+
+[project.scripts]
+lmbash = "lmbash.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lmbash*"]
