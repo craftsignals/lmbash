@@ -86,7 +86,9 @@ class CliTests(unittest.TestCase):
         request_command.side_effect = ["ls", "ls -a"]
         run_command.return_value = mock.Mock(stdout="", stderr="", returncode=0)
 
-        with mock.patch("builtins.input", side_effect=["e", "include hidden files", "y"]):
+        with mock.patch("builtins.input", side_effect=["e", "include hidden files", "y"]), mock.patch(
+            "sys.stdout"
+        ):
             exit_code = lmbash.main(["list files"])
 
         self.assertEqual(exit_code, 0)
@@ -100,7 +102,9 @@ class CliTests(unittest.TestCase):
     def test_main_config_saves_interactive_config(self):
         with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
             os.environ, {"XDG_CONFIG_HOME": temp_dir}, clear=True
-        ), mock.patch("builtins.input", side_effect=["1", "4", "", "llama3"]), mock.patch(
+        ), mock.patch("builtins.input", side_effect=["1", "4", "llama3"]), mock.patch(
+            "getpass.getpass", return_value=""
+        ), mock.patch(
             "sys.stdout"
         ) as stdout:
             exit_code = lmbash.main(["config"])
@@ -114,9 +118,8 @@ class CliTests(unittest.TestCase):
     def test_main_config_show_prints_masked_config(self):
         with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
             os.environ, {"XDG_CONFIG_HOME": temp_dir}, clear=True
-        ), mock.patch(
-            "builtins.input",
-            side_effect=["1", "2", "sk-openrouter-secret", "openrouter/model"],
+        ), mock.patch("builtins.input", side_effect=["1", "2", "openrouter/model"]), mock.patch(
+            "getpass.getpass", return_value="sk-openrouter-secret"
         ), mock.patch("sys.stdout"):
             self.assertEqual(lmbash.main(["config"]), 0)
 
@@ -129,10 +132,37 @@ class CliTests(unittest.TestCase):
         self.assertIn("api_key: sk-o...cret", output)
         self.assertNotIn("sk-openrouter-secret", output)
 
+    @mock.patch("lmbash.cli.load_config", side_effect=lmbash.ConfigError("bad config"))
+    def test_main_config_show_handles_config_error_cleanly(self, load_config):
+        with mock.patch("sys.stderr") as stderr:
+            exit_code = lmbash.main(["config", "--show"])
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn(
+            "Error: bad config",
+            "".join(call.args[0] for call in stderr.write.call_args_list),
+        )
+
+    @mock.patch("lmbash.cli.save_config", side_effect=lmbash.ConfigError("cannot write config"))
+    @mock.patch("lmbash.cli.configure_interactively")
+    def test_main_config_save_failure_returns_one(self, configure_interactively, save_config):
+        configure_interactively.return_value = mock.Mock()
+
+        with mock.patch("sys.stderr") as stderr:
+            exit_code = lmbash.main(["config"])
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn(
+            "Error: cannot write config",
+            "".join(call.args[0] for call in stderr.write.call_args_list),
+        )
+
     def test_main_config_reset_removes_existing_config(self):
         with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
             os.environ, {"XDG_CONFIG_HOME": temp_dir}, clear=True
-        ), mock.patch("builtins.input", side_effect=["2", "1", "secret", "claude"]), mock.patch(
+        ), mock.patch("builtins.input", side_effect=["2", "1", "claude"]), mock.patch(
+            "getpass.getpass", return_value="secret"
+        ), mock.patch(
             "sys.stdout"
         ):
             self.assertEqual(lmbash.main(["config"]), 0)

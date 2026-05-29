@@ -147,7 +147,11 @@ def print_result(result):
 
 def handle_config_command(args):
     if args.show:
-        config = load_config()
+        try:
+            config = load_config()
+        except ConfigError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
         if config is None:
             print("No lmbash config found.")
             return 1
@@ -155,18 +159,28 @@ def handle_config_command(args):
         return 0
 
     if args.reset:
-        if remove_config():
+        try:
+            removed = remove_config()
+        except OSError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+        if removed:
             print("Config removed.")
-        else:
-            print("No lmbash config found.")
+            return 0
+        print("No lmbash config found.")
         return 0
 
     try:
         config = configure_interactively()
-        save_config(config)
     except ConfigError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
+
+    try:
+        save_config(config)
+    except (ConfigError, OSError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
     print("Config saved.")
     return 0
 

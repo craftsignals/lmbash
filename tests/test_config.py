@@ -180,7 +180,9 @@ class ConfigTests(unittest.TestCase):
     def test_configure_interactively_openrouter_preset_requires_api_key(self):
         with mock.patch(
             "builtins.input",
-            side_effect=["1", "2", "sk-openrouter-secret", "openrouter/model"],
+            side_effect=["1", "2", "openrouter/model"],
+        ), mock.patch("getpass.getpass", return_value="sk-openrouter-secret"), mock.patch(
+            "sys.stdout"
         ):
             config = configure_interactively()
 
@@ -196,9 +198,12 @@ class ConfigTests(unittest.TestCase):
         )
 
     def test_configure_interactively_ollama_preset_allows_empty_api_key(self):
-        with mock.patch("builtins.input", side_effect=["1", "4", "", "llama3"]):
+        with mock.patch("builtins.input", side_effect=["1", "4", "llama3"]), mock.patch(
+            "getpass.getpass", return_value=""
+        ) as getpass, mock.patch("sys.stdout"):
             config = configure_interactively()
 
+        getpass.assert_called_once_with("API key: ")
         self.assertEqual(
             config,
             ProviderConfig(
@@ -213,7 +218,9 @@ class ConfigTests(unittest.TestCase):
     def test_configure_interactively_anthropic_preset(self):
         with mock.patch(
             "builtins.input",
-            side_effect=["2", "1", "anthropic-secret", "claude-3-5-sonnet"],
+            side_effect=["2", "1", "claude-3-5-sonnet"],
+        ), mock.patch("getpass.getpass", return_value="anthropic-secret"), mock.patch(
+            "sys.stdout"
         ):
             config = configure_interactively()
 
@@ -227,6 +234,15 @@ class ConfigTests(unittest.TestCase):
                 model="claude-3-5-sonnet",
             ),
         )
+
+    def test_configure_interactively_retries_invalid_choice(self):
+        with mock.patch("builtins.input", side_effect=["bad", "1", "4", "llama3"]), mock.patch(
+            "getpass.getpass", return_value=""
+        ), mock.patch("sys.stdout"):
+            config = configure_interactively()
+
+        self.assertEqual(config.preset, "ollama")
+        self.assertEqual(config.model, "llama3")
 
     def test_format_config_masks_api_key(self):
         config = ProviderConfig(

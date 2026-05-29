@@ -1,4 +1,5 @@
 from dataclasses import asdict
+import getpass
 import json
 import os
 from pathlib import Path
@@ -123,14 +124,16 @@ def _choose_option(prompt, options):
     for index, label in enumerate(options, start=1):
         print(f"{index}. {label}")
 
-    answer = input("> ").strip()
-    try:
-        choice = int(answer)
-    except ValueError as exc:
-        raise ConfigError("Invalid selection") from exc
-    if choice < 1 or choice > len(options):
-        raise ConfigError("Invalid selection")
-    return options[choice - 1]
+    while True:
+        answer = input("> ").strip()
+        try:
+            choice = int(answer)
+        except ValueError:
+            print("Invalid selection.")
+            continue
+        if 1 <= choice <= len(options):
+            return options[choice - 1]
+        print("Invalid selection.")
 
 
 def _prompt_required(label):
@@ -170,7 +173,7 @@ def configure_interactively():
     if not base_url:
         raise ConfigError("Base URL cannot be empty")
 
-    api_key = input("API key: ").strip()
+    api_key = getpass.getpass("API key: ").strip()
     if requires_api_key and not api_key:
         raise ConfigError("API key cannot be empty")
 
