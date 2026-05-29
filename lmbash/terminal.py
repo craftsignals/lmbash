@@ -44,3 +44,7 @@ def error(text, stream=None):
 
 def command_block(command, stream=None):
     return f"\n{heading('Generated command', stream)}\n{style(command, 'green', stream)}"
+
+
+def separator(stream=None):
+    return style("────────", "cyan", stream)

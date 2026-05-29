@@ -164,6 +164,7 @@ def main(argv=None):
             return 1
 
         print(terminal.command_block(command))
+        print(terminal.separator())
 
         action = choose_action()
         if action == "execute":

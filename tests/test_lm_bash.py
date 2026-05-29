@@ -94,6 +94,7 @@ class CliTests(unittest.TestCase):
         output = "".join(call.args[0] for call in stdout.write.call_args_list)
         self.assertEqual(exit_code, 0)
         self.assertIn("Generated command", output)
+        self.assertIn("\n────────\n", output)
         self.assertEqual(client.request_command.call_count, 2)
         refinement_prompt = client.request_command.call_args_list[1].args[0]
         self.assertIn("Original request:\nlist files", refinement_prompt)
