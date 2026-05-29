@@ -8,14 +8,6 @@ from lmbash.config import load_config
 from lmbash.providers import ProviderConfig
 
 
-class CleanupTests(unittest.TestCase):
-    def test_clean_command_strips_plain_fence(self):
-        self.assertEqual(lmbash.clean_command("```bash\npwd\n```"), "pwd")
-
-    def test_clean_command_strips_generic_fence(self):
-        self.assertEqual(lmbash.clean_command("```\nls -la\n```"), "ls -la")
-
-
 class ApiTests(unittest.TestCase):
     def test_build_refinement_prompt_includes_context(self):
         prompt = lmbash.build_refinement_prompt(

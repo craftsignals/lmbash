@@ -15,15 +15,6 @@ from lmbash.config import (
 from lmbash.providers import LmBashError, build_client
 
 
-def clean_command(content):
-    command = content.strip()
-    if command.startswith("```") and command.endswith("```"):
-        lines = command.splitlines()
-        if len(lines) >= 2:
-            command = "\n".join(lines[1:-1]).strip()
-    return command
-
-
 def build_refinement_prompt(original_prompt, previous_command, edit_request):
     return (
         "Update the bash command using this context.\n\n"
