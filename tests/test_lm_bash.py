@@ -15,42 +15,8 @@ class CleanupTests(unittest.TestCase):
     def test_clean_command_strips_generic_fence(self):
         self.assertEqual(lmbash.clean_command("```\nls -la\n```"), "ls -la")
 
-    def test_default_model_uses_gemma_when_env_missing(self):
-        with mock.patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(lmbash.default_model(), "google/gemma-4-e4b")
-
-    def test_default_model_uses_env_override(self):
-        with mock.patch.dict(os.environ, {"LMSTUDIO_MODEL": "custom/model"}, clear=True):
-            self.assertEqual(lmbash.default_model(), "custom/model")
-
 
 class ApiTests(unittest.TestCase):
-    def test_build_payload_requests_one_command(self):
-        payload = lmbash.build_payload("show current directory", "google/gemma-4-e4b")
-        self.assertEqual(payload["model"], "google/gemma-4-e4b")
-        self.assertEqual(payload["temperature"], 0)
-        self.assertIn("exactly one bash command", payload["messages"][0]["content"])
-        self.assertEqual(payload["messages"][1]["content"], "show current directory")
-
-    @mock.patch("lmbash.cli.urllib.request.urlopen")
-    def test_request_command_extracts_assistant_content(self, urlopen):
-        response = mock.Mock()
-        response.__enter__ = mock.Mock(return_value=response)
-        response.__exit__ = mock.Mock(return_value=None)
-        response.read.return_value = b'{"choices":[{"message":{"content":"pwd"}}]}'
-        urlopen.return_value = response
-
-        command = lmbash.request_command(
-            "show pwd",
-            "http://localhost:1234/v1",
-            "google/gemma-4-e4b",
-        )
-
-        self.assertEqual(command, "pwd")
-        request = urlopen.call_args.args[0]
-        self.assertEqual(request.full_url, "http://localhost:1234/v1/chat/completions")
-        self.assertEqual(request.get_method(), "POST")
-
     def test_build_refinement_prompt_includes_context(self):
         prompt = lmbash.build_refinement_prompt(
             "list files",

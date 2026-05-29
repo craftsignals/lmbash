@@ -1,11 +1,7 @@
 import argparse
 from dataclasses import replace
-import json
-import os
 import subprocess
 import sys
-import urllib.error
-import urllib.request
 
 from lmbash.config import (
     ConfigError,
@@ -19,14 +15,6 @@ from lmbash.config import (
 from lmbash.providers import LmBashError, build_client
 
 
-DEFAULT_BASE_URL = "http://localhost:1234/v1"
-DEFAULT_MODEL = "google/gemma-4-e4b"
-
-
-def default_model():
-    return os.environ.get("LMSTUDIO_MODEL", DEFAULT_MODEL)
-
-
 def clean_command(content):
     command = content.strip()
     if command.startswith("```") and command.endswith("```"):
@@ -34,23 +22,6 @@ def clean_command(content):
         if len(lines) >= 2:
             command = "\n".join(lines[1:-1]).strip()
     return command
-
-
-def build_payload(prompt, model):
-    return {
-        "model": model,
-        "temperature": 0,
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You convert user requests into exactly one bash command. "
-                    "Return only the command. Do not include explanations, Markdown, or comments."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
-    }
 
 
 def build_refinement_prompt(original_prompt, previous_command, edit_request):
@@ -61,37 +32,6 @@ def build_refinement_prompt(original_prompt, previous_command, edit_request):
         f"New requirement:\n{edit_request}\n\n"
         "Return exactly one updated bash command and nothing else."
     )
-
-
-def request_command(prompt, base_url, model):
-    url = base_url.rstrip("/") + "/chat/completions"
-    data = json.dumps(build_payload(prompt, model)).encode("utf-8")
-    request = urllib.request.Request(
-        url,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            body = response.read().decode("utf-8")
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise LmBashError(f"LM Studio returned HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise LmBashError(f"Cannot reach LM Studio: {exc.reason}") from exc
-
-    try:
-        payload = json.loads(body)
-        content = payload["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
-        raise LmBashError("LM Studio returned an invalid chat completion response") from exc
-
-    command = clean_command(content)
-    if not command:
-        raise LmBashError("LM Studio returned an empty command")
-    return command
 
 
 def parse_args(argv=None):
@@ -106,14 +46,14 @@ def parse_args(argv=None):
         return args
 
     parser = argparse.ArgumentParser(
-        description="Generate and optionally run a bash command using local LM Studio."
+        description="Generate and optionally run a bash command using a configured provider."
     )
     parser.add_argument(
         "--base-url",
         default=None,
-        help=f"LM Studio API base URL, default: {DEFAULT_BASE_URL}",
+        help="Provider API base URL override",
     )
-    parser.add_argument("--model", default=None, help="LM Studio model name")
+    parser.add_argument("--model", default=None, help="Provider model name override")
     parser.add_argument("prompt", nargs="*", help="Natural-language command request")
     args = parser.parse_args(argv)
     args.command = None
