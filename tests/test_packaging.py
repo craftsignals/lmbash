@@ -1,6 +1,10 @@
-import tomllib
 import unittest
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 
 class PackagingTests(unittest.TestCase):

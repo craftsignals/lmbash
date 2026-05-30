@@ -36,5 +36,8 @@ Issues = "https://github.com/craftsignals/lmbash/issues"
 [project.scripts]
 lmbash = "lmbash.cli:main"
 
+[project.optional-dependencies]
+test = ["tomli>=2.0.1; python_version < '3.11'"]
+
 [tool.setuptools.packages.find]
 include = ["lmbash*"]
