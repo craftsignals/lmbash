@@ -1,5 +1,10 @@
 # lmbash
 
+[![PyPI version](https://img.shields.io/pypi/v/lmbash.svg)](https://pypi.org/project/lmbash/)
+[![Python versions](https://img.shields.io/pypi/pyversions/lmbash.svg)](https://pypi.org/project/lmbash/)
+[![Tests](https://github.com/craftsignals/lmbash/actions/workflows/tests.yml/badge.svg)](https://github.com/craftsignals/lmbash/actions/workflows/tests.yml)
+[![License](https://img.shields.io/pypi/l/lmbash.svg)](LICENSE)
+
 Generate bash commands from natural-language requests using an LLM provider.
 `lmbash` always shows the generated command first and only runs it after
 explicit confirmation.
