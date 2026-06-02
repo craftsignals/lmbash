@@ -72,8 +72,8 @@ def open_json_request(request, proxy_url=""):
         with response_context as response:
             body = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise LmBashError(f"Provider returned HTTP {exc.code}: {detail}") from exc
+        detail = format_http_error(exc)
+        raise LmBashError(detail) from exc
     except urllib.error.URLError as exc:
         raise LmBashError(f"Cannot reach provider: {exc.reason}") from exc
     finally:
@@ -84,6 +84,16 @@ def open_json_request(request, proxy_url=""):
         return json.loads(body)
     except json.JSONDecodeError as exc:
         raise LmBashError("Provider returned an invalid JSON response") from exc
+
+
+def format_http_error(error):
+    body = error.read().decode("utf-8", errors="replace").strip()
+    reason = str(error.reason).strip() if error.reason else ""
+    reason_text = f" {reason}" if reason else ""
+    url_text = f" from {error.url}" if error.url else ""
+    if body:
+        return f"Provider returned HTTP {error.code}{reason_text}{url_text}: {body}"
+    return f"Provider returned HTTP {error.code}{reason_text}{url_text}: response body was empty"
 
 
 def clean_command(content):

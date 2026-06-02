@@ -2,6 +2,7 @@ import json
 import socket
 import sys
 import unittest
+import urllib.error
 from unittest import mock
 
 from lmbash.providers import LmBashError, ProviderConfig, build_client
@@ -187,6 +188,31 @@ class ProviderClientTests(unittest.TestCase):
         )
 
         with self.assertRaises(LmBashError):
+            client.request_command("show current directory")
+
+    @mock.patch("lmbash.providers.urllib.request.urlopen")
+    def test_http_error_with_empty_body_includes_request_context(self, urlopen):
+        urlopen.side_effect = urllib.error.HTTPError(
+            "http://localhost:1234/v1/chat/completions",
+            502,
+            "Bad Gateway",
+            {},
+            None,
+        )
+        client = build_client(
+            ProviderConfig(
+                provider="openai-compatible",
+                base_url="http://localhost:1234/v1",
+                api_key="",
+                model="local-model",
+            )
+        )
+
+        with self.assertRaisesRegex(
+            LmBashError,
+            "Provider returned HTTP 502 Bad Gateway from "
+            "http://localhost:1234/v1/chat/completions",
+        ):
             client.request_command("show current directory")
 
     @mock.patch("lmbash.providers.urllib.request.urlopen")
