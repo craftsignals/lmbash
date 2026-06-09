@@ -218,6 +218,14 @@ class ProviderClientTests(unittest.TestCase):
     @mock.patch("lmbash.providers.urllib.request.urlopen")
     def test_http_error_with_unreadable_empty_body_includes_request_context(self, urlopen):
         class UnreadableBodyHTTPError(urllib.error.HTTPError):
+            @property
+            def url(self):
+                raise KeyError("file")
+
+            @url.setter
+            def url(self, value):
+                self.filename = value
+
             def read(self):
                 raise KeyError("file")
 

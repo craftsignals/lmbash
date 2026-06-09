@@ -87,6 +87,12 @@ def open_json_request(request, proxy_url=""):
 
 
 def format_http_error(error):
+    def safe_attr(name, default=""):
+        try:
+            return getattr(error, name)
+        except (AttributeError, OSError, ValueError, KeyError):
+            return default
+
     try:
         raw_body = error.read()
     except (AttributeError, OSError, ValueError, KeyError):
@@ -95,12 +101,16 @@ def format_http_error(error):
         body = raw_body.decode("utf-8", errors="replace").strip()
     else:
         body = str(raw_body or "").strip()
-    reason = str(error.reason).strip() if error.reason else ""
+    reason_value = safe_attr("reason", safe_attr("msg"))
+    reason = str(reason_value).strip() if reason_value else ""
     reason_text = f" {reason}" if reason else ""
-    url_text = f" from {error.url}" if error.url else ""
+    url_value = safe_attr("url", safe_attr("filename"))
+    url = str(url_value).strip() if url_value else ""
+    url_text = f" from {url}" if url else ""
+    code = safe_attr("code", "unknown")
     if body:
-        return f"Provider returned HTTP {error.code}{reason_text}{url_text}: {body}"
-    return f"Provider returned HTTP {error.code}{reason_text}{url_text}: response body was empty"
+        return f"Provider returned HTTP {code}{reason_text}{url_text}: {body}"
+    return f"Provider returned HTTP {code}{reason_text}{url_text}: response body was empty"
 
 
 def clean_command(content):
