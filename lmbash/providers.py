@@ -87,7 +87,14 @@ def open_json_request(request, proxy_url=""):
 
 
 def format_http_error(error):
-    body = error.read().decode("utf-8", errors="replace").strip()
+    try:
+        raw_body = error.read()
+    except (AttributeError, OSError, ValueError, KeyError):
+        raw_body = b""
+    if isinstance(raw_body, bytes):
+        body = raw_body.decode("utf-8", errors="replace").strip()
+    else:
+        body = str(raw_body or "").strip()
     reason = str(error.reason).strip() if error.reason else ""
     reason_text = f" {reason}" if reason else ""
     url_text = f" from {error.url}" if error.url else ""

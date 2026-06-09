@@ -216,6 +216,35 @@ class ProviderClientTests(unittest.TestCase):
             client.request_command("show current directory")
 
     @mock.patch("lmbash.providers.urllib.request.urlopen")
+    def test_http_error_with_unreadable_empty_body_includes_request_context(self, urlopen):
+        class UnreadableBodyHTTPError(urllib.error.HTTPError):
+            def read(self):
+                raise KeyError("file")
+
+        urlopen.side_effect = UnreadableBodyHTTPError(
+            "http://localhost:1234/v1/chat/completions",
+            502,
+            "Bad Gateway",
+            {},
+            None,
+        )
+        client = build_client(
+            ProviderConfig(
+                provider="openai-compatible",
+                base_url="http://localhost:1234/v1",
+                api_key="",
+                model="local-model",
+            )
+        )
+
+        with self.assertRaisesRegex(
+            LmBashError,
+            "Provider returned HTTP 502 Bad Gateway from "
+            "http://localhost:1234/v1/chat/completions",
+        ):
+            client.request_command("show current directory")
+
+    @mock.patch("lmbash.providers.urllib.request.urlopen")
     def test_claude_posts_message_request_and_parses_text_response(self, urlopen):
         urlopen.return_value = self.make_response(
             {"content": [{"type": "thinking", "text": "ignored"}, {"type": "text", "text": "ls -la"}]}
