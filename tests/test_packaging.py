@@ -13,6 +13,7 @@ class PackagingTests(unittest.TestCase):
         data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
 
         self.assertEqual(data["project"]["name"], "lmbash")
+        self.assertEqual(data["project"]["version"], "0.2.0")
         self.assertEqual(data["project"]["requires-python"], ">=3.9")
         self.assertEqual(data["project"]["scripts"]["lmbash"], "lmbash.cli:main")
 
@@ -42,7 +43,9 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("socks5h://127.0.0.1:7890", readme_text)
         self.assertIn("proxy", readme_text)
         self.assertIn("shell-init", readme_text)
-        self.assertIn('eval "$(lmbash shell-init zsh)"', readme_text)
+        self.assertIn("[x] explain", readme_text)
+        self.assertIn("[xx] explain more", readme_text)
+        self.assertIn('eval "$(command lmbash shell-init zsh)"', readme_text)
         self.assertIn("Review every command", readme_text)
         self.assertIn("python3 -m unittest -v", readme_text)
         self.assertIn("python3 -m build", readme_text)

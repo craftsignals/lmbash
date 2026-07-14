@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lmbash"
-version = "0.1.0"
+version = "0.2.0"
 description = "Generate and optionally run bash commands using an LLM provider."
 readme = "README.md"
 requires-python = ">=3.9"
