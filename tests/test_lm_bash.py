@@ -50,6 +50,30 @@ class CliTests(unittest.TestCase):
         with mock.patch("builtins.input", return_value="e"):
             self.assertEqual(lmbash.choose_action(), "edit")
 
+    def test_shell_init_zsh_adds_command_to_zsh_history(self):
+        script = lmbash.build_shell_init("zsh")
+
+        self.assertIn('print -s -- "$command"', script)
+        self.assertIn('command lmbash --print-command "$@"', script)
+
+    @mock.patch("lmbash.cli.run_command")
+    @mock.patch("lmbash.cli.build_client")
+    @mock.patch("lmbash.cli.load_effective_config")
+    def test_main_print_command_outputs_final_command_without_execution(
+        self, load_effective_config, build_client, run_command
+    ):
+        client = mock.Mock()
+        client.request_command.return_value = "pwd"
+        build_client.return_value = client
+        load_effective_config.return_value = mock.Mock()
+
+        with mock.patch("builtins.input", return_value="y"), mock.patch("sys.stdout") as stdout:
+            exit_code = lmbash.main(["--print-command", "show pwd"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual("".join(call.args[0] for call in stdout.write.call_args_list), "pwd\n")
+        run_command.assert_not_called()
+
     def test_print_result_labels_stdout_stderr_and_exit_code(self):
         result = subprocess.CompletedProcess(
             args="cmd",

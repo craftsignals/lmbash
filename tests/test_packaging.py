@@ -41,6 +41,8 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("LMBASH_PROXY_URL", readme_text)
         self.assertIn("socks5h://127.0.0.1:7890", readme_text)
         self.assertIn("proxy", readme_text)
+        self.assertIn("shell-init", readme_text)
+        self.assertIn('eval "$(lmbash shell-init zsh)"', readme_text)
         self.assertIn("Review every command", readme_text)
         self.assertIn("python3 -m unittest -v", readme_text)
         self.assertIn("python3 -m build", readme_text)

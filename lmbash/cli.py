@@ -36,10 +36,21 @@ def parse_args(argv=None):
         args = parser.parse_args(argv[1:])
         args.command = "config"
         return args
+    if argv and argv[0] == "shell-init":
+        parser = argparse.ArgumentParser(description="Print shell integration for lmbash")
+        parser.add_argument("shell", choices=("bash", "zsh"))
+        args = parser.parse_args(argv[1:])
+        args.command = "shell-init"
+        return args
 
     parser = argparse.ArgumentParser(
         description="Generate and optionally run a bash command using a configured provider.",
         epilog="Commands: config  Configure lmbash",
+    )
+    parser.add_argument(
+        "--print-command",
+        action="store_true",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--base-url",
@@ -53,14 +64,21 @@ def parse_args(argv=None):
     return args
 
 
-def prompt_from_args(args):
+def prompt_from_args(args, stream=None):
     if args.prompt:
         return " ".join(args.prompt).strip()
-    return input(terminal.prompt("Describe the bash command you want: ")).strip()
+    if stream is None:
+        return input(terminal.prompt("Describe the bash command you want: ")).strip()
+    print(terminal.prompt("Describe the bash command you want: ", stream), end="", file=stream, flush=True)
+    return input().strip()
 
 
-def choose_action():
-    answer = input(terminal.action("Action? [y] execute, [e] edit, [N] cancel ")).strip().lower()
+def choose_action(stream=None):
+    if stream is None:
+        answer = input(terminal.action("Action? [y] execute, [e] edit, [N] cancel ")).strip().lower()
+    else:
+        print(terminal.action("Action? [y] execute, [e] edit, [N] cancel ", stream), end="", file=stream, flush=True)
+        answer = input().strip().lower()
     if answer in {"y", "yes"}:
         return "execute"
     if answer in {"e", "edit"}:
@@ -70,6 +88,17 @@ def choose_action():
 
 def run_command(command):
     return subprocess.run(command, shell=True, text=True, capture_output=True)
+
+
+def build_shell_init(shell):
+    history_command = 'history -s "$command"' if shell == "bash" else 'print -s -- "$command"'
+    return f'''lmbash() {{
+  local command
+  command="$(command lmbash --print-command "$@")" || return
+  [ -n "$command" ] || return 0
+  {history_command}
+  eval "$command"
+}}'''
 
 
 def print_result(result):
@@ -141,8 +170,12 @@ def main(argv=None):
     args = parse_args(argv)
     if args.command == "config":
         return handle_config_command(args)
+    if args.command == "shell-init":
+        print(build_shell_init(args.shell))
+        return 0
 
-    prompt = prompt_from_args(args)
+    display_stream = sys.stderr if args.print_command else None
+    prompt = prompt_from_args(args, stream=display_stream)
     if not prompt:
         print(terminal.error("prompt cannot be empty", stream=sys.stderr), file=sys.stderr)
         return 2
@@ -163,21 +196,29 @@ def main(argv=None):
             print(terminal.error(str(exc), stream=sys.stderr), file=sys.stderr)
             return 1
 
-        print(terminal.command_block(command))
-        print(terminal.separator())
+        print(terminal.command_block(command, stream=display_stream), file=display_stream)
+        print(terminal.separator(stream=display_stream), file=display_stream)
 
-        action = choose_action()
+        action = choose_action(stream=display_stream)
         if action == "execute":
             break
         if action == "cancel":
-            print("Cancelled.")
+            print("Cancelled.", file=display_stream)
             return 0
 
-        edit_request = input(terminal.prompt("How should the command change? ")).strip()
+        if display_stream is None:
+            edit_request = input(terminal.prompt("How should the command change? ")).strip()
+        else:
+            print(terminal.prompt("How should the command change? ", display_stream), end="", file=display_stream, flush=True)
+            edit_request = input().strip()
         if not edit_request:
-            print("Cancelled.")
+            print("Cancelled.", file=display_stream)
             return 0
         request_prompt = build_refinement_prompt(prompt, command, edit_request)
+
+    if args.print_command:
+        print(command)
+        return 0
 
     result = run_command(command)
     print_result(result)

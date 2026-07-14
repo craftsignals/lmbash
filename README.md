@@ -134,6 +134,24 @@ Override the model:
 lmbash --model your/model-name show current directory
 ```
 
+### Shell history integration
+
+When `lmbash` runs a command itself, it runs in a child shell. Child processes
+cannot add entries to the history of the shell that started them. To retain
+each confirmed command in your interactive shell history, load the integration
+for your shell:
+
+```bash
+# Zsh
+eval "$(lmbash shell-init zsh)"
+
+# Bash
+eval "$(lmbash shell-init bash)"
+```
+
+Add the applicable line to `~/.zshrc` or `~/.bashrc` to enable it in future
+shells. The integration records only commands you confirm with `y` or `yes`.
+
 ## Safety
 
 `lmbash` generates shell commands with an LLM. Review every command before
