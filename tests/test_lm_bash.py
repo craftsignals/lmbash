@@ -11,6 +11,11 @@ from lmbash.providers import ProviderConfig
 
 
 class ApiTests(unittest.TestCase):
+    def test_parse_risk_assessment_returns_level_and_reason(self):
+        self.assertEqual(lmbash.parse_risk_assessment("high\nDeletes files"), ("high", "Deletes files"))
+
+    def test_parse_risk_assessment_rejects_unknown_level(self):
+        self.assertIsNone(lmbash.parse_risk_assessment("critical\nUnknown"))
     def test_build_refinement_prompt_includes_context(self):
         prompt = lmbash.build_refinement_prompt(
             "list files",
@@ -25,6 +30,22 @@ class ApiTests(unittest.TestCase):
 
 
 class CliTests(unittest.TestCase):
+    @mock.patch("lmbash.cli.run_command")
+    @mock.patch("lmbash.cli.build_client")
+    @mock.patch("lmbash.cli.load_effective_config")
+    def test_main_explains_then_executes(self, load_effective_config, build_client, run_command):
+        client = mock.Mock()
+        client.request_command.return_value = "pwd"
+        client.request_analysis.side_effect = ["medium\nReads the current directory", "Brief", "Detailed"]
+        build_client.return_value = client
+        load_effective_config.return_value = mock.Mock()
+        run_command.return_value = mock.Mock(stdout="", stderr="", returncode=0)
+
+        with mock.patch("builtins.input", side_effect=["x", "xx", "y"]), mock.patch("sys.stdout") as stdout:
+            self.assertEqual(lmbash.main(["show pwd"]), 0)
+
+        self.assertEqual(client.request_analysis.call_count, 3)
+        self.assertIn("medium", "".join(call.args[0] for call in stdout.write.call_args_list).lower())
     def test_help_mentions_config_command(self):
         with self.assertRaises(SystemExit) as cm, mock.patch("sys.stdout") as stdout:
             lmbash.parse_args(["--help"])

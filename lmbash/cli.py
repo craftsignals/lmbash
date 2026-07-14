@@ -26,6 +26,28 @@ def build_refinement_prompt(original_prompt, previous_command, edit_request):
     )
 
 
+def build_risk_prompt(command):
+    return f"Assess this shell command. Return exactly low, medium, or high on the first line and one concise reason on the second. Do not execute it.\n\n{command}"
+
+
+def build_explanation_prompt(command, detail):
+    instruction = "Give three concise sections: purpose, key parts, and cautions." if detail == "brief" else "Explain each pipeline, redirect, variable, subcommand, and important option."
+    return f"{instruction} Do not execute, modify, or regenerate this command.\n\n{command}"
+
+
+def parse_risk_assessment(response):
+    if not isinstance(response, str):
+        return None
+    lines = response.splitlines()
+    if not lines:
+        return None
+    level = lines[0].strip().lower()
+    reason = " ".join(line.strip() for line in lines[1:] if line.strip())
+    if level not in {"low", "medium", "high"} or not reason:
+        return None
+    return level, reason
+
+
 def parse_args(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if argv and argv[0] == "config":
@@ -73,16 +95,22 @@ def prompt_from_args(args, stream=None):
     return input().strip()
 
 
-def choose_action(stream=None):
+def choose_action(explain_more_available=False, stream=None):
+    suffix = ", [xx] explain more" if explain_more_available else ""
+    message = f"Action? [y] execute, [e] edit, [x] explain{suffix}, [N] cancel "
     if stream is None:
-        answer = input(terminal.action("Action? [y] execute, [e] edit, [N] cancel ")).strip().lower()
+        answer = input(terminal.action(message)).strip().lower()
     else:
-        print(terminal.action("Action? [y] execute, [e] edit, [N] cancel ", stream), end="", file=stream, flush=True)
+        print(terminal.action(message, stream), end="", file=stream, flush=True)
         answer = input().strip().lower()
     if answer in {"y", "yes"}:
         return "execute"
     if answer in {"e", "edit"}:
         return "edit"
+    if answer == "x":
+        return "explain"
+    if answer == "xx" and explain_more_available:
+        return "explain-more"
     return "cancel"
 
 
@@ -188,7 +216,7 @@ def main(argv=None):
         return 1
 
     request_prompt = prompt
-
+    brief_explanation_seen = False
     while True:
         try:
             command = client.request_command(request_prompt)
@@ -198,13 +226,34 @@ def main(argv=None):
 
         print(terminal.command_block(command, stream=display_stream), file=display_stream)
         print(terminal.separator(stream=display_stream), file=display_stream)
+        try:
+            risk = parse_risk_assessment(client.request_analysis(build_risk_prompt(command)))
+            if risk and risk[0] != "low":
+                print(terminal.status(f"Risk ({risk[0]}): {risk[1]}", display_stream), file=display_stream)
+        except LmBashError:
+            print(terminal.status("Risk assessment unavailable", display_stream), file=display_stream)
 
-        action = choose_action(stream=display_stream)
-        if action == "execute":
+        while True:
+            action = choose_action(brief_explanation_seen, stream=display_stream)
+            if action == "execute":
+                if args.print_command:
+                    print(command)
+                    return 0
+                result = run_command(command)
+                print_result(result)
+                return result.returncode
+            if action == "cancel":
+                print("Cancelled.", file=display_stream)
+                return 0
+            if action in {"explain", "explain-more"}:
+                detail = "brief" if action == "explain" else "detailed"
+                try:
+                    print(client.request_analysis(build_explanation_prompt(command, detail)), file=display_stream)
+                    brief_explanation_seen = True
+                except LmBashError as exc:
+                    print(terminal.error(str(exc), stream=sys.stderr), file=sys.stderr)
+                continue
             break
-        if action == "cancel":
-            print("Cancelled.", file=display_stream)
-            return 0
 
         if display_stream is None:
             edit_request = input(terminal.prompt("How should the command change? ")).strip()
@@ -215,14 +264,7 @@ def main(argv=None):
             print("Cancelled.", file=display_stream)
             return 0
         request_prompt = build_refinement_prompt(prompt, command, edit_request)
-
-    if args.print_command:
-        print(command)
-        return 0
-
-    result = run_command(command)
-    print_result(result)
-    return result.returncode
+        brief_explanation_seen = False
 
 
 if __name__ == "__main__":
