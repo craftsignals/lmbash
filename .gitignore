@@ -11,6 +11,7 @@ env/
 htmlcov/
 
 docs/
+.worktrees/
 
 build/
 dist/
