@@ -127,12 +127,22 @@ def clean_command(content):
     return command
 
 
+def clean_text(content):
+    text = content.strip()
+    if not text:
+        raise LmBashError("Provider returned an empty response")
+    return text
+
+
 class OpenAICompatibleClient:
     def __init__(self, config):
         self.config = config
 
     def request_command(self, prompt):
         return self.complete_command(prompt)
+
+    def request_analysis(self, prompt):
+        return self.complete_analysis(prompt)
 
     def complete_command(self, prompt):
         headers = {"Content-Type": "application/json"}
@@ -161,6 +171,24 @@ class OpenAICompatibleClient:
             raise LmBashError("Provider returned an invalid chat completion response")
         return clean_command(content)
 
+    def complete_analysis(self, prompt):
+        headers = {"Content-Type": "application/json"}
+        if self.config.api_key:
+            headers["Authorization"] = f"Bearer {self.config.api_key}"
+        response = post_json(
+            self.config.base_url.rstrip("/") + "/chat/completions",
+            {"model": self.config.model, "temperature": 0, "messages": [{"role": "user", "content": prompt}]},
+            headers,
+            self.config.proxy_url,
+        )
+        try:
+            content = response["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise LmBashError("Provider returned an invalid chat completion response") from exc
+        if not isinstance(content, str):
+            raise LmBashError("Provider returned an invalid chat completion response")
+        return clean_text(content)
+
 
 class ClaudeCompatibleClient:
     def __init__(self, config):
@@ -168,6 +196,9 @@ class ClaudeCompatibleClient:
 
     def request_command(self, prompt):
         return self.complete_command(prompt)
+
+    def request_analysis(self, prompt):
+        return self.complete_analysis(prompt)
 
     def complete_command(self, prompt):
         payload = {
@@ -199,6 +230,24 @@ class ClaudeCompatibleClient:
                 text = item.get("text")
                 if isinstance(text, str):
                     return clean_command(text)
+        raise LmBashError("Provider returned an invalid Claude message response")
+
+    def complete_analysis(self, prompt):
+        response = post_json(
+            self.config.base_url.rstrip("/") + "/v1/messages",
+            {"model": self.config.model, "temperature": 0, "max_tokens": 1024, "messages": [{"role": "user", "content": prompt}]},
+            {"Content-Type": "application/json", "x-api-key": self.config.api_key, "anthropic-version": "2023-06-01"},
+            self.config.proxy_url,
+        )
+        try:
+            content_items = response["content"]
+        except (KeyError, TypeError) as exc:
+            raise LmBashError("Provider returned an invalid Claude message response") from exc
+        if not isinstance(content_items, list):
+            raise LmBashError("Provider returned an invalid Claude message response")
+        for item in content_items:
+            if isinstance(item, dict) and item.get("type") == "text" and isinstance(item.get("text"), str):
+                return clean_text(item["text"])
         raise LmBashError("Provider returned an invalid Claude message response")
 
 

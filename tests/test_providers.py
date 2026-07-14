@@ -5,10 +5,24 @@ import unittest
 import urllib.error
 from unittest import mock
 
-from lmbash.providers import LmBashError, ProviderConfig, build_client
+from lmbash.providers import ClaudeCompatibleClient, LmBashError, OpenAICompatibleClient, ProviderConfig, build_client
 
 
 class ProviderClientTests(unittest.TestCase):
+    def test_openai_analysis_preserves_multiline_text(self):
+        config = ProviderConfig("openai-compatible", "https://api.example.test/v1", "key", "model", "test")
+        response = {"choices": [{"message": {"content": "medium\nDeletes files"}}]}
+
+        with mock.patch("lmbash.providers.post_json", return_value=response):
+            self.assertEqual(OpenAICompatibleClient(config).request_analysis("Assess: rm file"), "medium\nDeletes files")
+
+    def test_claude_analysis_rejects_empty_text(self):
+        config = ProviderConfig("claude-compatible", "https://api.example.test", "key", "model", "test")
+        response = {"content": [{"type": "text", "text": "  "}]}
+
+        with mock.patch("lmbash.providers.post_json", return_value=response):
+            with self.assertRaisesRegex(LmBashError, "empty response"):
+                ClaudeCompatibleClient(config).request_analysis("Explain: ls")
     def make_response(self, body):
         response = mock.Mock()
         response.__enter__ = mock.Mock(return_value=response)
