@@ -155,6 +155,8 @@ eval "$(command lmbash shell-init bash)"
 
 Add the applicable line to `~/.zshrc` or `~/.bashrc` to enable it in future
 shells. The integration records only commands you confirm with `y` or `yes`.
+Confirmed commands run in a child Bash process, including when you use Zsh;
+changes such as `cd` do not affect your interactive shell. Bash must be on `PATH`.
 
 ## Safety
 

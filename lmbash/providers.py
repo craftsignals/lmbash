@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import http.client
 import importlib
 import json
 import socket
@@ -76,6 +77,8 @@ def open_json_request(request, proxy_url=""):
         raise LmBashError(detail) from exc
     except urllib.error.URLError as exc:
         raise LmBashError(f"Cannot reach provider: {exc.reason}") from exc
+    except (OSError, http.client.HTTPException) as exc:
+        raise LmBashError(f"Cannot reach provider: {exc}") from exc
     finally:
         if original_socket is not None:
             socket.socket = original_socket

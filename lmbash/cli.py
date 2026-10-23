@@ -1,4 +1,5 @@
 import argparse
+from contextlib import redirect_stdout
 from dataclasses import replace
 import subprocess
 import sys
@@ -121,11 +122,20 @@ def run_command(command):
 def build_shell_init(shell):
     history_command = 'history -s "$command"' if shell == "bash" else 'print -s -- "$command"'
     return f'''lmbash() {{
-  local command
+  case "${{1-}}" in
+    config|shell-init) command lmbash "$@"; return ;;
+  esac
+  local command _lmbash_arg
+  for _lmbash_arg in "$@"; do
+    case "$_lmbash_arg" in
+      --) break ;;
+      -h*|--h|--he|--hel|--help) command lmbash "$@"; return ;;
+    esac
+  done
   command="$(command lmbash --print-command "$@")" || return
   [ -n "$command" ] || return 0
   {history_command}
-  eval "$command"
+  command bash -c "$command"
 }}'''
 
 
@@ -209,7 +219,8 @@ def main(argv=None):
         return 2
 
     try:
-        config = load_effective_config(args)
+        with redirect_stdout(display_stream or sys.stdout):
+            config = load_effective_config(args)
         client = build_client(config)
     except (ConfigError, LmBashError, OSError) as exc:
         print(terminal.error(str(exc), stream=sys.stderr), file=sys.stderr)
@@ -228,7 +239,9 @@ def main(argv=None):
         print(terminal.separator(stream=display_stream), file=display_stream)
         try:
             risk = parse_risk_assessment(client.request_analysis(build_risk_prompt(command)))
-            if risk and risk[0] != "low":
+            if risk is None:
+                print(terminal.status("Risk assessment unavailable", display_stream), file=display_stream)
+            elif risk[0] != "low":
                 print(terminal.status(f"Risk ({risk[0]}): {risk[1]}", display_stream), file=display_stream)
         except LmBashError:
             print(terminal.status("Risk assessment unavailable", display_stream), file=display_stream)

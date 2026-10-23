@@ -1,3 +1,4 @@
+import http.client
 import json
 import socket
 import sys
@@ -9,6 +10,16 @@ from lmbash.providers import ClaudeCompatibleClient, LmBashError, OpenAICompatib
 
 
 class ProviderClientTests(unittest.TestCase):
+    def test_analysis_wraps_response_read_errors_for_both_providers(self):
+        for provider in ("openai-compatible", "claude-compatible"):
+            with self.subTest(provider=provider):
+                response = self.make_response({})
+                response.read.side_effect = http.client.IncompleteRead(b"partial")
+                client = build_client(ProviderConfig(provider, "http://unused.test", "", "test"))
+                with mock.patch("lmbash.providers.urllib.request.urlopen", return_value=response):
+                    with self.assertRaisesRegex(LmBashError, "Cannot reach provider"):
+                        client.request_analysis("Explain pwd")
+
     def test_openai_analysis_preserves_multiline_text(self):
         config = ProviderConfig("openai-compatible", "https://api.example.test/v1", "key", "model", "test")
         response = {"choices": [{"message": {"content": "medium\nDeletes files"}}]}

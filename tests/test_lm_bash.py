@@ -1,3 +1,6 @@
+import http.client
+import io
+import json
 import os
 import subprocess
 import tempfile
@@ -30,6 +33,63 @@ class ApiTests(unittest.TestCase):
 
 
 class CliTests(unittest.TestCase):
+    def test_invalid_risk_response_reports_unavailable_and_allows_execution(self):
+        config = ProviderConfig("openai-compatible", "http://unused.test/v1", "", "test")
+        for risk in ("high: Deletes files", "critical\nDeletes files", "high", ""):
+            with self.subTest(risk=risk):
+                responses = [
+                    io.BytesIO(json.dumps({"choices": [{"message": {"content": text}}]}).encode())
+                    for text in ("pwd", risk)
+                ]
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with mock.patch("lmbash.cli.load_effective_config", return_value=config), mock.patch(
+                    "lmbash.providers.urllib.request.urlopen", side_effect=responses
+                ), mock.patch("builtins.input", return_value="y"), mock.patch(
+                    "sys.stdout", stdout
+                ), mock.patch("sys.stderr", stderr):
+                    exit_code = lmbash.main(["--print-command", "show pwd"])
+                self.assertEqual(exit_code, 0)
+                self.assertEqual(stdout.getvalue(), "pwd\n")
+                self.assertIn("Risk assessment unavailable", stderr.getvalue())
+
+    def test_risk_network_failure_keeps_the_execution_menu(self):
+        config = ProviderConfig("openai-compatible", "http://unused.test/v1", "", "test")
+        for error in (
+            TimeoutError("timed out"),
+            ConnectionResetError("connection reset"),
+            http.client.RemoteDisconnected("connection closed"),
+        ):
+            with self.subTest(error=type(error).__name__):
+                response = io.BytesIO(b'{"choices": [{"message": {"content": "pwd"}}]}')
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with mock.patch("lmbash.cli.load_effective_config", return_value=config), mock.patch(
+                    "lmbash.providers.urllib.request.urlopen", side_effect=[response, error]
+                ), mock.patch("builtins.input", return_value="y"), mock.patch(
+                    "sys.stdout", stdout
+                ), mock.patch("sys.stderr", stderr):
+                    exit_code = lmbash.main(["--print-command", "show pwd"])
+                self.assertEqual(exit_code, 0)
+                self.assertEqual(stdout.getvalue(), "pwd\n")
+                self.assertIn("Risk assessment unavailable", stderr.getvalue())
+
+    def test_explanation_network_failure_keeps_the_execution_menu(self):
+        config = ProviderConfig("openai-compatible", "http://unused.test/v1", "", "test")
+        responses = [
+            io.BytesIO(json.dumps({"choices": [{"message": {"content": text}}]}).encode())
+            for text in ("pwd", "low\nRead only")
+        ]
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with mock.patch("lmbash.cli.load_effective_config", return_value=config), mock.patch(
+            "lmbash.providers.urllib.request.urlopen", side_effect=responses + [TimeoutError("timed out")]
+        ), mock.patch("builtins.input", side_effect=["x", "y"]), mock.patch(
+            "sys.stdout", stdout
+        ), mock.patch("sys.stderr", stderr):
+            exit_code = lmbash.main(["--print-command", "show pwd"])
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stdout.getvalue(), "pwd\n")
+        self.assertIn("Error:", stderr.getvalue())
+        self.assertIn("timed out", stderr.getvalue())
+
     @mock.patch("lmbash.cli.run_command")
     @mock.patch("lmbash.cli.build_client")
     @mock.patch("lmbash.cli.load_effective_config")
